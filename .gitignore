@@ -1,0 +1,36 @@
+# Generados por Protobuf
+*.pb.h
+*.pb.cc
+
+# Directorios de build
+build/
+cmake-build-debug/
+cmake-build-release/
+
+# Ejecutables
+*.exe
+nombe_del_servidor
+nombe_del_cliente
+
+# Archivos compilados
+*.o
+*.a
+*.lib
+*.dll
+*.so
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Directorios de salida
+bin/
+out/
+dist/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
