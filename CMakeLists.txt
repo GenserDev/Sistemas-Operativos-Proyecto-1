@@ -74,16 +74,42 @@ add_executable(chat_client
     ${PROTO_SRCS}
 )
 
+# Protobuf v5+ (Homebrew) depende de abseil, intentar encontrarlo
+find_package(absl QUIET)
+
 # Enlazar bibliotecas
 if(WIN32)
     target_link_libraries(chat_server ${Protobuf_LIBRARIES} ws2_32)
     target_link_libraries(chat_client ${Protobuf_LIBRARIES} ws2_32)
 elseif(APPLE)
-    # macOS: pthread viene incluido, no necesita -lpthread explícito
-    target_link_libraries(chat_server ${Protobuf_LIBRARIES})
-    target_link_libraries(chat_client ${Protobuf_LIBRARIES})
+    if(absl_FOUND)
+        # Protobuf v5+ necesita abseil
+        target_link_libraries(chat_server ${Protobuf_LIBRARIES}
+            absl::log_internal_message absl::log_internal_check_op
+            absl::log_internal_nullguard absl::strings absl::status
+            absl::cord absl::raw_logging_internal)
+        target_link_libraries(chat_client ${Protobuf_LIBRARIES}
+            absl::log_internal_message absl::log_internal_check_op
+            absl::log_internal_nullguard absl::strings absl::status
+            absl::cord absl::raw_logging_internal)
+    else()
+        # Protobuf v3 sin abseil
+        target_link_libraries(chat_server ${Protobuf_LIBRARIES})
+        target_link_libraries(chat_client ${Protobuf_LIBRARIES})
+    endif()
 else()
     # Linux
-    target_link_libraries(chat_server pthread ${Protobuf_LIBRARIES})
-    target_link_libraries(chat_client pthread ${Protobuf_LIBRARIES})
+    if(absl_FOUND)
+        target_link_libraries(chat_server pthread ${Protobuf_LIBRARIES}
+            absl::log_internal_message absl::log_internal_check_op
+            absl::log_internal_nullguard absl::strings absl::status
+            absl::cord absl::raw_logging_internal)
+        target_link_libraries(chat_client pthread ${Protobuf_LIBRARIES}
+            absl::log_internal_message absl::log_internal_check_op
+            absl::log_internal_nullguard absl::strings absl::status
+            absl::cord absl::raw_logging_internal)
+    else()
+        target_link_libraries(chat_server pthread ${Protobuf_LIBRARIES})
+        target_link_libraries(chat_client pthread ${Protobuf_LIBRARIES})
+    endif()
 endif()
