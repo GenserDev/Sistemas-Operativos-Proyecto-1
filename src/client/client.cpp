@@ -81,7 +81,7 @@ bool ChatClient::send_message(const std::string& message) {
 
     chat::MessageGeneral msg;
     msg.set_message(message);
-    msg.set_status(0);  // ACTIVE
+    msg.set_status(static_cast<chat::StatusEnum>(0));  // ACTIVE
     msg.set_username_origin(current_username);
     msg.set_ip(get_local_ip());
 
@@ -100,7 +100,7 @@ bool ChatClient::send_dm(const std::string& recipient, const std::string& messag
 
     chat::MessageDM dm;
     dm.set_message(message);
-    dm.set_status(0);  // ACTIVE
+    dm.set_status(static_cast<chat::StatusEnum>(0));  // ACTIVE
     dm.set_username_des(recipient);
     dm.set_ip(get_local_ip());
 
@@ -138,7 +138,7 @@ bool ChatClient::request_user_info(const std::string& username) {
 
 bool ChatClient::change_status(int status) {
     chat::ChangeStatus cs;
-    cs.set_status(status);
+    cs.set_status(static_cast<chat::StatusEnum>(status));
     cs.set_username(current_username);
     cs.set_ip(get_local_ip());
 
@@ -224,12 +224,10 @@ void ChatClient::process_server_message(const std::string& raw_message) {
             response.ParseFromString(payload);
 
             std::cout << "\n[SERVIDOR] " << response.message() << std::endl;
-            if (response.has_status_code()) {
-                if (response.is_successful()) {
-                    std::cout << "[✓] Exitoso" << std::endl;
-                } else {
-                    std::cout << "[✗] Falló" << std::endl;
-                }
+            if (response.is_successful()) {
+                std::cout << "[✓] Exitoso" << std::endl;
+            } else {
+                std::cout << "[✗] Falló" << std::endl;
             }
             break;
         }

@@ -6,32 +6,24 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Encontrar Protobuf
 find_package(Protobuf REQUIRED)
-include_directories(${PROTOBUF_INCLUDE_DIR})
 
-# Directorio de salida de protobuf
-set(PROTO_SRC_DIR "${CMAKE_BINARY_DIR}/protos")
-file(MAKE_DIRECTORY ${PROTO_SRC_DIR})
-
-# Compilar proto files
-file(GLOB PROTO_FILES 
-    "${CMAKE_SOURCE_DIR}/protos/common.proto"
-    "${CMAKE_SOURCE_DIR}/protos/cliente-side/*.proto"
-    "${CMAKE_SOURCE_DIR}/protos/server-side/*.proto"
-)
-
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS 
-    PROTOC_OUT_DIR ${PROTO_SRC_DIR}
-    ${PROTO_FILES}
-)
+# Directorio de archivos generados
+set(PROTO_SRC_DIR "${CMAKE_SOURCE_DIR}/protos")
 
 # Incluir directorios
 include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${PROTO_SRC_DIR})
+include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 # Archivos fuente comunes (utils)
 set(UTILS_SRCS
     src/utils/tcp_handler.cpp
     src/utils/message_handler.cpp
+)
+
+# Archivos proto compilados
+file(GLOB PROTO_GENERATED_SRCS 
+    "${PROTO_SRC_DIR}/*.pb.cc"
 )
 
 # Servidor
@@ -40,12 +32,7 @@ add_executable(nombe_del_servidor
     src/server/server.cpp
     src/server/client_handler.cpp
     ${UTILS_SRCS}
-    ${PROTO_SRCS}
-)
-target_link_libraries(nombe_del_servidor 
-    ${PROTOBUF_LIBRARIES}
-    pthread
-    ws2_32  # Para Windows sockets
+    ${PROTO_GENERATED_SRCS}
 )
 
 # Cliente
@@ -53,10 +40,8 @@ add_executable(nombe_del_cliente
     src/client/main.cpp
     src/client/client.cpp
     ${UTILS_SRCS}
-    ${PROTO_SRCS}
+    ${PROTO_GENERATED_SRCS}
 )
-target_link_libraries(nombe_del_cliente
-    ${PROTOBUF_LIBRARIES}
-    pthread
-    ws2_32  # Para Windows sockets
-)
+
+target_link_libraries(nombe_del_servidor pthread ${PROTOBUF_LIBRARIES})
+target_link_libraries(nombe_del_cliente pthread ${PROTOBUF_LIBRARIES})

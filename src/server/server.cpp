@@ -239,7 +239,7 @@ void ChatServer::handle_client(int client_socket) {
                     std::vector<User> users = get_all_users();
                     for (const auto& user : users) {
                         all_users.add_usernames(user.username);
-                        all_users.add_status(user.status);
+                        all_users.add_status(static_cast<chat::StatusEnum>(user.status));
                     }
                     std::string users_payload = all_users.SerializeAsString();
                     std::string users_wrapped = MessageHandler::wrap_message(
@@ -293,7 +293,7 @@ void ChatServer::handle_client(int client_socket) {
                 std::vector<User> users = get_all_users();
                 for (const auto& user : users) {
                     all_users.add_usernames(user.username);
-                    all_users.add_status(user.status);
+                    all_users.add_status(static_cast<chat::StatusEnum>(user.status));
                 }
                 std::string payload = all_users.SerializeAsString();
                 std::string wrapped = MessageHandler::wrap_message(
@@ -313,7 +313,7 @@ void ChatServer::handle_client(int client_socket) {
                     chat::GetUserInfoResponse response;
                     response.set_ip_address(user->ip);
                     response.set_username(user->username);
-                    response.set_status(user->status);
+                    response.set_status(static_cast<chat::StatusEnum>(user->status));
 
                     std::string resp_payload = response.SerializeAsString();
                     std::string wrapped = MessageHandler::wrap_message(

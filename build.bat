@@ -18,7 +18,7 @@ if not exist "build" (
 cd build
 
 echo [*] Ejecutando CMake...
-cmake -G "Visual Studio 16 2019" -A x64 ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
 
 if errorlevel 1 (
     echo [ERROR] CMake falló
