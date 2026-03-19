@@ -78,7 +78,12 @@ add_executable(chat_client
 if(WIN32)
     target_link_libraries(chat_server ${Protobuf_LIBRARIES} ws2_32)
     target_link_libraries(chat_client ${Protobuf_LIBRARIES} ws2_32)
+elseif(APPLE)
+    # macOS: pthread viene incluido, no necesita -lpthread explícito
+    target_link_libraries(chat_server ${Protobuf_LIBRARIES})
+    target_link_libraries(chat_client ${Protobuf_LIBRARIES})
 else()
+    # Linux
     target_link_libraries(chat_server pthread ${Protobuf_LIBRARIES})
     target_link_libraries(chat_client pthread ${Protobuf_LIBRARIES})
 endif()

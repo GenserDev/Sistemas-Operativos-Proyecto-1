@@ -6,17 +6,43 @@ echo "Simple Chat Protocol - Build (Linux/macOS)"
 echo "========================================"
 echo ""
 
+# Detectar sistema operativo
+OS="$(uname -s)"
+case "$OS" in
+    Linux*)     PLATFORM="Linux";;
+    Darwin*)    PLATFORM="macOS";;
+    *)          PLATFORM="Unknown";;
+esac
+
+echo "[*] Plataforma detectada: $PLATFORM"
+echo ""
+
 # Verificar dependencias
 if ! command -v cmake &> /dev/null; then
     echo "[ERROR] CMake no esta instalado"
-    echo "Instala con: sudo apt-get install cmake"
+    if [ "$PLATFORM" = "macOS" ]; then
+        echo "Instala con: brew install cmake"
+    else
+        echo "Instala con: sudo apt-get install cmake"
+    fi
     exit 1
 fi
 
 if ! command -v protoc &> /dev/null; then
     echo "[ERROR] protoc no esta instalado"
-    echo "Instala con: sudo apt-get install protobuf-compiler libprotobuf-dev"
+    if [ "$PLATFORM" = "macOS" ]; then
+        echo "Instala con: brew install protobuf"
+    else
+        echo "Instala con: sudo apt-get install protobuf-compiler libprotobuf-dev"
+    fi
     exit 1
+fi
+
+# Detectar numero de cores
+if [ "$PLATFORM" = "macOS" ]; then
+    NUM_CORES=$(sysctl -n hw.ncpu 2>/dev/null || echo 4)
+else
+    NUM_CORES=$(nproc 2>/dev/null || echo 4)
 fi
 
 # Crear directorio build
@@ -32,8 +58,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo "[*] Compilando..."
-make -j$(nproc 2>/dev/null || echo 4)
+echo "[*] Compilando con $NUM_CORES cores..."
+make -j"$NUM_CORES"
 
 if [ $? -ne 0 ]; then
     echo "[ERROR] Compilacion fallo"
@@ -43,7 +69,7 @@ fi
 
 echo ""
 echo "========================================"
-echo "[OK] Compilacion completada"
+echo "[OK] Compilacion completada ($PLATFORM)"
 echo "========================================"
 echo ""
 echo "Ejecutables en: build/"
