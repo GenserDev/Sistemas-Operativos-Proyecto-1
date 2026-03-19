@@ -1,6 +1,4 @@
 @echo off
-REM Script de compilación para Simple Chat Protocol (Windows)
-
 setlocal enabledelayedexpansion
 
 echo.
@@ -9,7 +7,6 @@ echo Simple Chat Protocol - Windows Build
 echo ========================================
 echo.
 
-REM Verificar si existe el directorio build
 if not exist "build" (
     echo [*] Creando directorio build...
     mkdir build
@@ -21,7 +18,7 @@ echo [*] Ejecutando CMake...
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
 
 if errorlevel 1 (
-    echo [ERROR] CMake falló
+    echo [ERROR] CMake fallo
     goto :error
 )
 
@@ -29,24 +26,23 @@ echo [*] Compilando...
 cmake --build . --config Release
 
 if errorlevel 1 (
-    echo [ERROR] Compilación falló
+    echo [ERROR] Compilacion fallo
     goto :error
 )
 
 echo.
 echo ========================================
-echo [✓] Compilación completada con éxito
+echo [OK] Compilacion completada
 echo ========================================
 echo.
-echo Ejecutables generados en: build/Release/
+echo Ejecutables en: build/
 echo.
-echo Para ejecutar:
-echo   Servidor: .\Release\nombe_del_servidor.exe [puerto]
-echo   Cliente:  .\Release\nombe_del_cliente.exe [host] [puerto]
+echo   Servidor: chat_server.exe ^<puerto^>
+echo   Cliente:  chat_client.exe ^<usuario^> ^<IP_servidor^> ^<puerto^>
 echo.
 echo Ejemplo:
-echo   Terminal 1: .\Release\nombe_del_servidor.exe 8080
-echo   Terminal 2: .\Release\nombe_del_cliente.exe 127.0.0.1 8080
+echo   Terminal 1: chat_server.exe 8080
+echo   Terminal 2: chat_client.exe juan 192.168.1.10 8080
 echo.
 
 cd ..
@@ -54,7 +50,7 @@ exit /b 0
 
 :error
 echo.
-echo [✗] Error durante la compilación
+echo [X] Error durante la compilacion
 echo.
 cd ..
 exit /b 1

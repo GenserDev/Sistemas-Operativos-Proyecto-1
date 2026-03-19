@@ -2,7 +2,6 @@
 #include "tcp_handler.h"
 #include "message_handler.h"
 
-// Importar proto files
 #include "register.pb.h"
 #include "message_general.pb.h"
 #include "message_dm.pb.h"
@@ -17,371 +16,327 @@
 #include "get_user_info_response.pb.h"
 
 #include <iostream>
-#include <thread>
 #include <sstream>
 #include <chrono>
+#include <thread>
 
-ChatClient::ChatClient(const std::string& server_host, uint16_t server_port)
-    : server_host(server_host), server_port(server_port), socket_fd(-1),
-      current_username(""), running(false) {
+ChatClient::ChatClient(const std::string& username, const std::string& server_host, uint16_t server_port)
+    : username(username), server_host(server_host), server_port(server_port),
+      socket_fd(-1), running(false) {
+    local_ip = TCPHandler::get_local_ip();
 }
 
 ChatClient::~ChatClient() {
     disconnect();
 }
 
-bool ChatClient::connect() {
-    TCPHandler tcp;
-    
-    if (!tcp.connect(server_host, server_port)) {
-        std::cerr << "Error: No se pudo conectar al servidor" << std::endl;
+bool ChatClient::connect_to_server() {
+    socket_fd = TCPHandler::connect_to(server_host, server_port);
+    if (socket_fd < 0) {
         return false;
     }
-
-    socket_fd = tcp.get_socket();
     running = true;
+    std::cout << "Conectado a " << server_host << ":" << server_port << std::endl;
     return true;
 }
 
 void ChatClient::disconnect() {
     running = false;
 
-    if (receive_thread.joinable()) {
-        receive_thread.join();
-    }
-
-    if (socket_fd != -1) {
-        TCPHandler tcp;
-        tcp.close_socket(socket_fd);
+    if (socket_fd >= 0) {
+        TCPHandler::close_socket(socket_fd);
         socket_fd = -1;
     }
 
-    std::cout << "\nDesconectado del servidor" << std::endl;
+    if (receive_thread.joinable()) {
+        receive_thread.join();
+    }
 }
 
-bool ChatClient::send_register(const std::string& username) {
-    current_username = username;
-
+bool ChatClient::send_register() {
     chat::Register reg;
     reg.set_username(username);
-    reg.set_ip(get_local_ip());
+    reg.set_ip(local_ip);
 
     std::string payload = reg.SerializeAsString();
     std::string wrapped = MessageHandler::wrap_message(MessageType::REGISTER, payload);
-
-    TCPHandler tcp;
-    return tcp.send_message(socket_fd, wrapped);
+    return TCPHandler::send_all(socket_fd, wrapped);
 }
 
-bool ChatClient::send_message(const std::string& message) {
-    if (current_username.empty()) {
-        std::cerr << "Error: Primero debe registrarse" << std::endl;
-        return false;
-    }
-
+bool ChatClient::send_broadcast(const std::string& message) {
     chat::MessageGeneral msg;
     msg.set_message(message);
-    msg.set_status(static_cast<chat::StatusEnum>(0));  // ACTIVE
-    msg.set_username_origin(current_username);
-    msg.set_ip(get_local_ip());
+    msg.set_status(static_cast<chat::StatusEnum>(0));
+    msg.set_username_origin(username);
+    msg.set_ip(local_ip);
 
     std::string payload = msg.SerializeAsString();
     std::string wrapped = MessageHandler::wrap_message(MessageType::MESSAGE_GENERAL, payload);
-
-    TCPHandler tcp;
-    return tcp.send_message(socket_fd, wrapped);
+    return TCPHandler::send_all(socket_fd, wrapped);
 }
 
 bool ChatClient::send_dm(const std::string& recipient, const std::string& message) {
-    if (current_username.empty()) {
-        std::cerr << "Error: Primero debe registrarse" << std::endl;
-        return false;
-    }
-
     chat::MessageDM dm;
     dm.set_message(message);
-    dm.set_status(static_cast<chat::StatusEnum>(0));  // ACTIVE
+    dm.set_status(static_cast<chat::StatusEnum>(0));
     dm.set_username_des(recipient);
-    dm.set_ip(get_local_ip());
+    dm.set_ip(local_ip);
 
     std::string payload = dm.SerializeAsString();
     std::string wrapped = MessageHandler::wrap_message(MessageType::MESSAGE_DM, payload);
-
-    TCPHandler tcp;
-    return tcp.send_message(socket_fd, wrapped);
+    return TCPHandler::send_all(socket_fd, wrapped);
 }
 
 bool ChatClient::request_user_list() {
-    chat::ListUsers list_req;
-    list_req.set_username(current_username);
-    list_req.set_ip(get_local_ip());
+    chat::ListUsers req;
+    req.set_username(username);
+    req.set_ip(local_ip);
 
-    std::string payload = list_req.SerializeAsString();
+    std::string payload = req.SerializeAsString();
     std::string wrapped = MessageHandler::wrap_message(MessageType::LIST_USERS, payload);
-
-    TCPHandler tcp;
-    return tcp.send_message(socket_fd, wrapped);
+    return TCPHandler::send_all(socket_fd, wrapped);
 }
 
-bool ChatClient::request_user_info(const std::string& username) {
-    chat::GetUserInfo gui;
-    gui.set_username_des(username);
-    gui.set_username(current_username);
-    gui.set_ip(get_local_ip());
+bool ChatClient::request_user_info(const std::string& target) {
+    chat::GetUserInfo req;
+    req.set_username_des(target);
+    req.set_username(username);
+    req.set_ip(local_ip);
 
-    std::string payload = gui.SerializeAsString();
+    std::string payload = req.SerializeAsString();
     std::string wrapped = MessageHandler::wrap_message(MessageType::GET_USER_INFO, payload);
-
-    TCPHandler tcp;
-    return tcp.send_message(socket_fd, wrapped);
+    return TCPHandler::send_all(socket_fd, wrapped);
 }
 
 bool ChatClient::change_status(int status) {
     chat::ChangeStatus cs;
     cs.set_status(static_cast<chat::StatusEnum>(status));
-    cs.set_username(current_username);
-    cs.set_ip(get_local_ip());
+    cs.set_username(username);
+    cs.set_ip(local_ip);
 
     std::string payload = cs.SerializeAsString();
     std::string wrapped = MessageHandler::wrap_message(MessageType::CHANGE_STATUS, payload);
-
-    TCPHandler tcp;
-    return tcp.send_message(socket_fd, wrapped);
+    return TCPHandler::send_all(socket_fd, wrapped);
 }
 
 bool ChatClient::send_quit() {
-    chat::Quit quit_msg;
-    quit_msg.set_quit(true);
-    quit_msg.set_ip(get_local_ip());
+    chat::Quit q;
+    q.set_quit(true);
+    q.set_ip(local_ip);
 
-    std::string payload = quit_msg.SerializeAsString();
+    std::string payload = q.SerializeAsString();
     std::string wrapped = MessageHandler::wrap_message(MessageType::QUIT, payload);
-
-    TCPHandler tcp;
-    return tcp.send_message(socket_fd, wrapped);
+    return TCPHandler::send_all(socket_fd, wrapped);
 }
 
 void ChatClient::run() {
-    std::string username;
-
     std::cout << "\n=== CLIENTE DE CHAT ===" << std::endl;
-    std::cout << "Ingrese su nombre de usuario: ";
-    std::getline(std::cin, username);
+    std::cout << "Usuario: " << username << std::endl;
 
-    if (!send_register(username)) {
+    // Registrarse con el servidor
+    if (!send_register()) {
         std::cerr << "Error: No se pudo enviar registro" << std::endl;
         return;
     }
 
-    // Iniciar thread de recepción
+    // Thread de recepcion
     receive_thread = std::thread(&ChatClient::receive_loop, this);
 
-    // Dar tiempo para recibir respuesta del servidor
+    // Esperar respuesta del servidor
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    // Loop de envío (entrada del usuario)
+    // Input del usuario
     handle_user_input();
 
-    // Enviar quit
+    // Enviar quit antes de desconectar
     send_quit();
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
     disconnect();
 }
 
 void ChatClient::receive_loop() {
-    TCPHandler tcp;
-
     while (running) {
-        std::string raw_message = tcp.receive_message(socket_fd);
+        std::string raw = TCPHandler::receive_full_message(socket_fd);
 
-        if (raw_message.empty()) {
-            std::cout << "\n[DESCONEXIÓN] Servidor cerró la conexión" << std::endl;
-            running = false;
+        if (raw.empty()) {
+            if (running) {
+                std::cout << "\n[DESCONEXION] Servidor cerro la conexion" << std::endl;
+                running = false;
+            }
             break;
         }
 
-        MessageType type;
-        std::string payload;
-
-        if (!MessageHandler::unwrap_message(raw_message, type, payload)) {
-            continue;
-        }
-
-        process_server_message(raw_message);
+        process_server_message(raw);
+        std::cout << "\n> " << std::flush; // Re-mostrar prompt
     }
 }
 
-void ChatClient::process_server_message(const std::string& raw_message) {
+void ChatClient::process_server_message(const std::string& raw) {
     MessageType type;
     std::string payload;
 
-    if (!MessageHandler::unwrap_message(raw_message, type, payload)) {
+    if (!MessageHandler::unwrap_message(raw, type, payload)) {
         return;
     }
 
     switch (type) {
         case MessageType::SERVER_RESPONSE: {
-            chat::ServerResponse response;
-            response.ParseFromString(payload);
-
-            std::cout << "\n[SERVIDOR] " << response.message() << std::endl;
-            if (response.is_successful()) {
-                std::cout << "[✓] Exitoso" << std::endl;
+            chat::ServerResponse resp;
+            resp.ParseFromString(payload);
+            if (resp.is_successful()) {
+                std::cout << "\n[OK] " << resp.message() << std::endl;
             } else {
-                std::cout << "[✗] Falló" << std::endl;
+                std::cout << "\n[ERROR] " << resp.message() << std::endl;
             }
             break;
         }
 
         case MessageType::ALL_USERS: {
-            chat::AllUsers all_users;
-            all_users.ParseFromString(payload);
+            chat::AllUsers all;
+            all.ParseFromString(payload);
 
-            std::cout << "\n[USUARIOS CONECTADOS]" << std::endl;
-            for (int i = 0; i < all_users.usernames_size(); ++i) {
-                std::string status_str;
-                switch (all_users.status(i)) {
-                    case 0: status_str = "ACTIVO"; break;
-                    case 1: status_str = "NO MOLESTAR"; break;
-                    case 2: status_str = "INVISIBLE"; break;
-                    default: status_str = "DESCONOCIDO"; break;
+            std::cout << "\n--- Usuarios conectados ---" << std::endl;
+            for (int i = 0; i < all.usernames_size(); ++i) {
+                std::string st;
+                switch (all.status(i)) {
+                    case 0: st = "ACTIVO"; break;
+                    case 1: st = "OCUPADO"; break;
+                    case 2: st = "INACTIVO"; break;
+                    default: st = "DESCONOCIDO"; break;
                 }
-                std::cout << "  - " << all_users.usernames(i) << " (" << status_str << ")" << std::endl;
+                std::cout << "  " << all.usernames(i) << " [" << st << "]" << std::endl;
             }
+            std::cout << "---------------------------" << std::endl;
             break;
         }
 
         case MessageType::FOR_DM: {
             chat::ForDm dm;
             dm.ParseFromString(payload);
-
             std::cout << "\n[DM de " << dm.username_des() << "]: " << dm.message() << std::endl;
             break;
         }
 
         case MessageType::BROADCAST_MESSAGES: {
-            chat::BroadcastDelivery broadcast;
-            broadcast.ParseFromString(payload);
-
-            std::cout << "\n[CHAT GENERAL] " << broadcast.username_origin() << ": "
-                      << broadcast.message() << std::endl;
+            chat::BroadcastDelivery bc;
+            bc.ParseFromString(payload);
+            std::cout << "\n[GENERAL] " << bc.username_origin() << ": " << bc.message() << std::endl;
             break;
         }
 
         case MessageType::GET_USER_INFO_RESPONSE: {
-            chat::GetUserInfoResponse response;
-            response.ParseFromString(payload);
+            chat::GetUserInfoResponse info;
+            info.ParseFromString(payload);
 
-            std::cout << "\n[INFO DE USUARIO]" << std::endl;
-            std::cout << "  Usuario: " << response.username() << std::endl;
-            std::cout << "  IP: " << response.ip_address() << std::endl;
-            
-            std::string status_str;
-            switch (response.status()) {
-                case 0: status_str = "ACTIVO"; break;
-                case 1: status_str = "NO MOLESTAR"; break;
-                case 2: status_str = "INVISIBLE"; break;
-                default: status_str = "DESCONOCIDO"; break;
+            std::string st;
+            switch (info.status()) {
+                case 0: st = "ACTIVO"; break;
+                case 1: st = "OCUPADO"; break;
+                case 2: st = "INACTIVO"; break;
+                default: st = "DESCONOCIDO"; break;
             }
-            std::cout << "  Estado: " << status_str << std::endl;
+
+            std::cout << "\n--- Info de usuario ---" << std::endl;
+            std::cout << "  Usuario: " << info.username() << std::endl;
+            std::cout << "  IP:      " << info.ip_address() << std::endl;
+            std::cout << "  Estado:  " << st << std::endl;
+            std::cout << "-----------------------" << std::endl;
             break;
         }
 
         default:
-            std::cout << "[?] Mensaje desconocido del servidor" << std::endl;
             break;
     }
 }
 
-void ChatClient::display_menu() {
-    std::cout << "\n=== MENÚ ===" << std::endl;
-    std::cout << "1. Enviar mensaje al chat general" << std::endl;
-    std::cout << "2. Enviar mensaje directo" << std::endl;
-    std::cout << "3. Ver lista de usuarios" << std::endl;
-    std::cout << "4. Ver información de usuario" << std::endl;
-    std::cout << "5. Cambiar estado" << std::endl;
-    std::cout << "6. Salir" << std::endl;
-    std::cout << "Opción: ";
+void ChatClient::display_help() {
+    std::cout << "\n========= AYUDA =========" << std::endl;
+    std::cout << "Comandos disponibles:" << std::endl;
+    std::cout << "  1 - Enviar mensaje al chat general (broadcasting)" << std::endl;
+    std::cout << "  2 - Enviar mensaje directo (privado)" << std::endl;
+    std::cout << "  3 - Cambiar estado (ACTIVO/OCUPADO/INACTIVO)" << std::endl;
+    std::cout << "  4 - Ver lista de usuarios conectados" << std::endl;
+    std::cout << "  5 - Ver informacion de un usuario" << std::endl;
+    std::cout << "  6 - Ayuda (este menu)" << std::endl;
+    std::cout << "  7 - Salir del chat" << std::endl;
+    std::cout << "=========================" << std::endl;
 }
 
 void ChatClient::handle_user_input() {
     std::string input;
 
+    display_help();
+
     while (running) {
-        display_menu();
+        std::cout << "\n> ";
         std::getline(std::cin, input);
 
-        if (input.empty()) continue;
+        if (input.empty() || !running) continue;
 
-        switch (input[0]) {
-            case '1': {
-                // Enviar mensaje al chat general
-                std::cout << "Mensaje: ";
-                std::getline(std::cin, input);
-                send_message(input);
-                break;
+        if (input == "1") {
+            // Broadcasting
+            std::cout << "Mensaje: ";
+            std::string msg;
+            std::getline(std::cin, msg);
+            if (!msg.empty()) {
+                send_broadcast(msg);
             }
+        }
+        else if (input == "2") {
+            // Mensaje directo
+            std::cout << "Destinatario: ";
+            std::string dest;
+            std::getline(std::cin, dest);
 
-            case '2': {
-                // Enviar mensaje directo
-                std::cout << "Destinatario: ";
-                std::string recipient;
-                std::getline(std::cin, recipient);
-                
-                std::cout << "Mensaje: ";
-                std::string message;
-                std::getline(std::cin, message);
-                
-                send_dm(recipient, message);
-                break;
+            std::cout << "Mensaje: ";
+            std::string msg;
+            std::getline(std::cin, msg);
+
+            if (!dest.empty() && !msg.empty()) {
+                send_dm(dest, msg);
             }
+        }
+        else if (input == "3") {
+            // Cambiar estado
+            std::cout << "  0 - ACTIVO" << std::endl;
+            std::cout << "  1 - OCUPADO" << std::endl;
+            std::cout << "  2 - INACTIVO" << std::endl;
+            std::cout << "Nuevo estado: ";
+            std::getline(std::cin, input);
 
-            case '3': {
-                // Ver lista de usuarios
-                request_user_list();
-                break;
-            }
-
-            case '4': {
-                // Ver información de usuario
-                std::cout << "Usuario a consultar: ";
-                std::string username;
-                std::getline(std::cin, username);
-                request_user_info(username);
-                break;
-            }
-
-            case '5': {
-                // Cambiar estado
-                std::cout << "\n0. ACTIVO" << std::endl;
-                std::cout << "1. NO MOLESTAR" << std::endl;
-                std::cout << "2. INVISIBLE" << std::endl;
-                std::cout << "Nuevo estado: ";
-                std::getline(std::cin, input);
-                
-                try {
-                    int status = std::stoi(input);
-                    if (status >= 0 && status <= 2) {
-                        change_status(status);
-                    }
-                } catch (...) {
-                    std::cout << "Estado inválido" << std::endl;
+            try {
+                int st = std::stoi(input);
+                if (st >= 0 && st <= 2) {
+                    change_status(st);
+                } else {
+                    std::cout << "Estado invalido" << std::endl;
                 }
-                break;
+            } catch (...) {
+                std::cout << "Estado invalido" << std::endl;
             }
-
-            case '6': {
-                // Salir
-                running = false;
-                return;
+        }
+        else if (input == "4") {
+            // Lista de usuarios
+            request_user_list();
+        }
+        else if (input == "5") {
+            // Info de usuario
+            std::cout << "Nombre del usuario: ";
+            std::string target;
+            std::getline(std::cin, target);
+            if (!target.empty()) {
+                request_user_info(target);
             }
-
-            default:
-                std::cout << "Opción inválida" << std::endl;
-                break;
+        }
+        else if (input == "6") {
+            display_help();
+        }
+        else if (input == "7") {
+            running = false;
+            return;
+        }
+        else {
+            std::cout << "Opcion invalida. Escriba 6 para ayuda." << std::endl;
         }
     }
-}
-
-std::string ChatClient::get_local_ip() {
-    return TCPHandler::get_local_ip();
 }

@@ -2,7 +2,6 @@
 #define TCP_HANDLER_H
 
 #include <string>
-#include <vector>
 #include <cstdint>
 
 /**
@@ -11,33 +10,36 @@
  */
 class TCPHandler {
 public:
-    TCPHandler();
-    ~TCPHandler();
+    // Servidor: crear socket, bind, listen
+    static int create_server(const std::string& host, uint16_t port, int backlog = 10);
 
-    // Servidor
-    bool listen(const std::string& host, uint16_t port);
-    int accept_connection();
-    bool close_socket(int socket_fd);
+    // Servidor: aceptar conexión, devuelve socket del cliente
+    static int accept_connection(int server_socket);
 
-    // Cliente
-    bool connect(const std::string& host, uint16_t port);
-    int get_socket() const { return socket_fd; }
+    // Cliente: conectar a servidor, devuelve socket
+    static int connect_to(const std::string& host, uint16_t port);
 
-    // Comunicación
-    bool send_message(int socket_fd, const std::string& data);
-    std::string receive_message(int socket_fd, int buffer_size = 4096);
-    
-    // Utilidades
+    // Enviar datos completos por socket
+    static bool send_all(int socket_fd, const std::string& data);
+
+    // Recibir exactamente n bytes
+    static bool recv_exact(int socket_fd, char* buffer, size_t n);
+
+    // Recibir un mensaje completo con framing (5-byte header + payload)
+    static std::string receive_full_message(int socket_fd);
+
+    // Cerrar socket
+    static void close_socket(int socket_fd);
+
+    // Obtener IP local
     static std::string get_local_ip();
 
-private:
-    int socket_fd;
-    int server_socket_fd;
+    // Obtener IP del peer conectado
+    static std::string get_peer_ip(int socket_fd);
 
-#ifdef _WIN32
-    void initialize_winsock();
-    void cleanup_winsock();
-#endif
+    // Inicializar/limpiar Winsock (solo Windows)
+    static void init_network();
+    static void cleanup_network();
 };
 
 #endif // TCP_HANDLER_H

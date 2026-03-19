@@ -4,32 +4,26 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <memory>
 #include <mutex>
 #include <thread>
+#include <atomic>
+#include <chrono>
 
-/**
- * Estructura para almacenar información de un usuario conectado
- */
 struct User {
     std::string username;
     std::string ip;
     int socket_fd;
-    int status;  // StatusEnum (0=ACTIVE, 1=DO_NOT_DISTURB, 2=INVISIBLE)
+    int status;  // 0=ACTIVE, 1=DO_NOT_DISTURB, 2=INVISIBLE
+    std::chrono::steady_clock::time_point last_activity;
 };
 
-/**
- * Servidor de chat que gestiona múltiples clientes
- */
 class ChatServer {
 public:
-    ChatServer(uint16_t port = 8080);
+    ChatServer(uint16_t port);
     ~ChatServer();
 
-    // Ciclo de vida
-    bool start();
-    void stop();
     void run();
+    void stop();
 
     // Gestión de usuarios
     bool register_user(const std::string& username, const std::string& ip, int socket_fd);
@@ -37,29 +31,35 @@ public:
     User* get_user(const std::string& username);
     std::vector<User> get_all_users();
 
-    // Gestión de mensajes
+    // Mensajes
     void broadcast_message(const std::string& message, const std::string& username_origin);
-    void send_dm(const std::string& message, const std::string& username_des, 
-                 const std::string& username_origin);
-    void update_user_status(const std::string& username, int new_status);
+    void send_dm(const std::string& message, const std::string& username_des,
+                 const std::string& username_origin, int origin_socket);
+    void update_user_status(const std::string& username, int new_status, int socket_fd);
+
+    // Respuestas
+    void send_server_response(int socket_fd, int status_code, const std::string& msg, bool success);
+    void send_user_list(int socket_fd);
+    void send_user_info(int socket_fd, const std::string& target_username);
 
 private:
     uint16_t port;
     int server_socket;
-    bool running;
-    
-    // Thread pool y sincronización
+    std::atomic<bool> running;
+
     std::vector<std::thread> client_threads;
     std::mutex users_mutex;
-    std::mutex sockets_mutex;
 
-    // Almacenamiento de usuarios
-    std::map<std::string, User> users;  // username -> User
-    std::map<int, std::string> socket_to_user;  // socket_fd -> username
+    std::map<std::string, User> users;        // username -> User
+    std::map<int, std::string> socket_to_user; // socket_fd -> username
 
-    // Métodos privados
+    // Inactivity
+    std::thread inactivity_thread;
+    static const int INACTIVITY_SECONDS = 60; // 1 minuto para fácil evaluación
+
     void handle_client(int client_socket);
-    void process_message(int client_socket, const std::string& raw_message);
+    void check_inactivity();
+    void touch_user(const std::string& username);
 };
 
 #endif // SERVER_H

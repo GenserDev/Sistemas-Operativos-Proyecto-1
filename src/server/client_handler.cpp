@@ -1,2 +1,1 @@
-// Client handler - manejador de clientes del servidor
-// Esta funcionalidad está integrada en server.cpp
+// Funcionalidad integrada en server.cpp
