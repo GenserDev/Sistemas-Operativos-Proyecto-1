@@ -1,255 +1,196 @@
-# Guía de Uso - Simple Chat Protocol
+# Guía de uso — Simple Chat Protocol
 
-## Descripción General
+## Descripción general
 
-Simple Chat Protocol es una aplicación de chat cliente-servidor en C++ que utiliza Protocol Buffers para la comunicación. Permite:
+Aplicación de chat cliente-servidor en C++ con **sockets TCP**, **multithreading** y **Protocol Buffers**. Permite:
 
-- ✓ Chat general entre múltiples usuarios
-- ✓ Mensajes directos (DM) privados
-- ✓ Gestión de estado de usuario (Activo, No molestar, Invisible)
-- ✓ Solicitud de información de otros usuarios
-- ✓ Multithreading para conexiones simultáneas
+- Chat general (broadcast) entre usuarios conectados
+- Mensajes directos (DM) privados
+- Estados de usuario: **ACTIVO**, **OCUPADO**, **INACTIVO**
+- Listado de usuarios e información (incluida IP) de un usuario concreto
+- Ayuda y salida ordenada
 
-## Inicio Rápido
+## Compilación
 
-### 1. Terminal Servidor
+Instala **CMake**, un **compilador C++17** y **Protobuf** según tu sistema operativo (ver [COMPILACION.md](COMPILACION.md)). Luego, en Linux o macOS:
+
 ```bash
-cd build
-./nombe_del_servidor 8080
+chmod +x build.sh
+./build.sh
 ```
 
-Salida esperada:
+En Windows, con las mismas dependencias configuradas, ejecuta `build.bat` desde la raíz del proyecto.
+
+Los ejecutables quedan en **`build/chat_server`** y **`build/chat_client`**.
+
+## Inicio rápido
+
+### 1. Terminal — servidor
+
+```bash
+./build/chat_server 8080
+```
+
+Salida esperada (resumen):
+
 ```
 === SERVIDOR DE CHAT INICIADO ===
 Puerto: 8080
+Timeout inactividad: 60 segundos
 ```
 
-### 2. Terminal Cliente 1
+### 2. Terminal — cliente 1
+
+El **nombre de usuario** se pasa por línea de comandos (no se pide después):
+
 ```bash
-cd build
-./nombe_del_cliente 127.0.0.1 8080
-=== CLIENTE DE CHAT ===
-Ingrese su nombre de usuario: Alice
+./build/chat_client Alice 127.0.0.1 8080
 ```
 
-### 3. Terminal Cliente 2 (en otra ventana)
+### 3. Terminal — cliente 2
+
 ```bash
-cd build
-./nombe_del_cliente 127.0.0.1 8080
-=== CLIENTE DE CHAT ===
-Ingrese su nombre de usuario: Bob
+./build/chat_client Bob 127.0.0.1 8080
 ```
 
-## Menú de Opciones
+## Menú de opciones
 
-Una vez conectado, cada cliente vera el menú:
+Tras conectarse, el cliente muestra un menú numérico:
+
+| Opción | Acción |
+|--------|--------|
+| **1** | Enviar mensaje al chat general (broadcast) |
+| **2** | Enviar mensaje directo (privado) |
+| **3** | Cambiar estado (ACTIVO / OCUPADO / INACTIVO) |
+| **4** | Ver lista de usuarios conectados |
+| **5** | Ver información de un usuario (IP, estado, etc.) |
+| **6** | Ayuda (vuelve a mostrar el menú) |
+| **7** | Salir (avisa al servidor y cierra) |
+
+### Opción 1: chat general
+
+Todos los demás clientes conectados reciben el mensaje (el emisor no lo recibe de vuelta por broadcast).
 
 ```
-=== MENÚ ===
-1. Enviar mensaje al chat general
-2. Enviar mensaje directo
-3. Ver lista de usuarios
-4. Ver información de usuario
-5. Cambiar estado
-6. Salir
-```
-
-### Opción 1: Chat General
-Todos los usuarios activos (no invisibles) reciben el mensaje.
-
-```
-Opción: 1
+> 1
 Mensaje: Hola a todos!
 ```
 
-### Opción 2: Mensaje Directo (DM)
-Envía un mensaje privado a un usuario específico.
+En pantalla del resto aparece una línea similar a: `[GENERAL] Alice: Hola a todos!`
+
+### Opción 2: mensaje directo
 
 ```
-Opción: 2
+> 2
 Destinatario: Bob
-Mensaje: Hola Bob, ¿cómo estás?
+Mensaje: Hola Bob
 ```
 
-### Opción 3: Ver Lista de Usuarios
-Muestra todos los usuarios conectados y sus estados.
+Bob verá algo como: `[DM de Alice]: Hola Bob`
+
+### Opción 3: cambiar estado
 
 ```
-Opción: 3
-
-[USUARIOS CONECTADOS]
-  - Alice (ACTIVO)
-  - Bob (ACTIVO)
-  - Charlie (NO MOLESTAR)
-```
-
-### Opción 4: Ver Información de Usuario
-Obtiene detalles sobre un usuario específico (IP, estado).
-
-```
-Opción: 4
-Usuario a consultar: Bob
-
-[INFO DE USUARIO]
-  Usuario: Bob
-  IP: 192.168.1.50
-  Estado: ACTIVO
-```
-
-### Opción 5: Cambiar Estado
-Modifica tu estado de disponibilidad.
-
-```
-Opción: 5
-
-0. ACTIVO
-1. NO MOLESTAR
-2. INVISIBLE
+> 3
+  0 - ACTIVO
+  1 - OCUPADO
+  2 - INACTIVO
 Nuevo estado: 1
 ```
 
-**Estados:**
-- **0 - ACTIVO**: Disponible, recibe todos los mensajes
-- **1 - NO MOLESTAR**: Disponible pero no desea interrupciones
-- **2 - INVISIBLE**: Conectado pero aparece como desconectado
+El servidor confirma con un mensaje `[OK]` o `[ERROR]` según el caso.
 
-### Opción 6: Salir
-Desconecta del servidor limpiamente.
+### Opción 4: lista de usuarios
+
+Muestra nombres y estado entre líneas tipo:
 
 ```
-Opción: 6
-Desconectado del servidor
+--- Usuarios conectados ---
+  Alice [ACTIVO]
+  Bob [OCUPADO]
+---------------------------
 ```
 
-## Tipos de Mensajes del Sistema
-
-### [SERVIDOR]
-Respuestas del servidor a solicitudes.
+### Opción 5: información de un usuario
 
 ```
-[SERVIDOR] Registro exitoso
-[✓] Exitoso
+> 5
+Nombre del usuario: Bob
 ```
 
-### [DM de usuario]
-Mensaje directo recibido.
+Muestra usuario, IP y estado si el usuario está conectado.
 
-```
-[DM de Alice]: Hola, ¿recibiste mi mensaje?
-```
+### Opción 6: ayuda
 
-### [CHAT GENERAL]
-Mensaje del chat general.
+Vuelve a imprimir el menú de comandos.
 
-```
-[CHAT GENERAL] Alice: ¿Alguien quiere jugar?
-```
+### Opción 7: salir
 
-### [INFO DE USUARIO]
-Información solicitada sobre otro usuario.
+Cierra la sesión en el servidor y termina el cliente.
 
-```
-[INFO DE USUARIO]
-  Usuario: Charlie
-  IP: 192.168.1.60
-  Estado: NO MOLESTAR
-```
+## Mensajes que verás en pantalla
 
-### [USUARIOS CONECTADOS]
-Lista de usuarios activos.
+| Prefijo / formato | Significado |
+|-------------------|-------------|
+| `[OK] ...` | Operación correcta (respuesta del servidor) |
+| `[ERROR] ...` | Error (por ejemplo nombre duplicado, usuario no encontrado) |
+| `[GENERAL] usuario: texto` | Mensaje del chat general |
+| `[DM de usuario]: texto` | Mensaje privado recibido |
+| Bloques `--- Usuarios conectados ---` / `--- Info de usuario ---` | Respuestas a listado o consulta de usuario |
 
-```
-[USUARIOS CONECTADOS]
-  - Alice (ACTIVO)
-  - Bob (ACTIVO)
-  - Charlie (NO MOLESTAR)
-```
+## Comportamiento útil
 
-## Notas de Comportamiento
+### Multithreading en el cliente
 
-### Usuarios Invisibles
-- No aparecen en la lista de usuarios
-- Pueden enviar mensajes
-- Reciben DMs pero no broadcast
+Un hilo recibe mensajes del servidor mientras escribes en el menú; por eso pueden aparecer líneas de chat entre tus `>`.
 
-### Multithreading
-- El servidor maneja cada cliente en un thread separado
-- Múltiples clientes pueden conectarse simultáneamente
-- Acceso concurrente a datos está sincronizado con mutexes
+### Registro
 
-### Persistencia
-- Los usuarios se registran solo mientras están conectados
-- Al desconectar, los datos se pierde
-- No hay base de datos persistente
+El registro con el servidor ocurre **automáticamente** al iniciar, usando el nombre que pasaste en la línea de comandos.
+
+### Inactividad
+
+El servidor puede marcar un usuario como **INACTIVO** tras un periodo sin actividad (valor configurable en código; por defecto suele ser del orden de un minuto). Ver consola del servidor y mensajes `[OK]` en el cliente.
+
+### Sin persistencia
+
+No hay base de datos: al desconectar, no queda historial en el servidor.
 
 ### Encabezado TCP (5 bytes)
-```
-Byte 0: Tipo de mensaje (1-14)
-Bytes 1-4: Longitud del payload (big-endian)
-```
 
-## Solución de Problemas
+Cada mensaje lógico lleva: 1 byte de tipo, 4 bytes de longitud (big-endian) y el payload protobuf. Detalle en [docs/protocol_standard.md](docs/protocol_standard.md).
 
-### "Error: No se pudo conectar al servidor"
-- Verificar que el servidor esté ejecutándose
-- Verificar IP y puerto correctos
-- Si es remoto, verificar cortafuegos
+## Solución de problemas
 
-### "Error: Primero debe registrarse"
-- Algunos comandos requieren estar registrado
-- El registro ocurre automáticamente al iniciar
+### "No se pudo conectar al servidor"
 
-### Usuario no recibe mensajes
-- Si está INVISIBLE, está configurado así
-- Si el remitente es él mismo, se filtra
-- Verificar que esté conectado
+- Comprueba que el servidor esté en ejecución.
+- Revisa IP y puerto.
+- En red local, revisa firewall y que la IP del servidor sea la correcta.
 
-### Desconexiones inesperadas
-- Verificar conexión de red
-- Revisar logs del servidor
-- Intentar reconectar
+### "Nombre de usuario o IP ya registrados"
 
-## Ejemplos de Uso
+El servidor no permite dos usuarios con el mismo nombre ni el mismo IP registrado a la vez (según la lógica del proyecto).
 
-### Ejemplo 1: Chat Simple
-```
-1. Dos usuarios conectan
-2. Alice: Opción 1 → "Hola Bob"
-3. Bob recibe: [CHAT GENERAL] Alice: Hola Bob
-4. Bob: Opción 1 → "Hola Alice"
-5. Alice recibe: [CHAT GENERAL] Bob: Hola Alice
-```
+### No ves mensajes
 
-### Ejemplo 2: Mensaje Directo
-```
-1. Opción 2
-2. Destinatario: Charlie
-3. Mensaje: Saludo privado
-4. Charlie recibe: [DM de Alice]: Saludo privado
-```
+- Comprueba que sigas conectado.
+- Para DM, el destinatario debe existir en el servidor.
 
-### Ejemplo 3: Cambiar Disponibilidad
-```
-1. Alice: Opción 5 → Estado 1 (NO MOLESTAR)
-2. Otros usuarios ven que Alice está "NO MOLESTAR"
-3. Alice sigue recibiendo DMs
-4. Otros todavía pueden ver a Alice en lista
-```
+## Ejemplos rápidos
 
-## Limitaciones Conocidas
+**Dos usuarios en chat general**
 
-- No hay historial de mensajes
-- Los nombres de usuario no pueden contener cambios
-- No hay autenticación de contraseñas
-- Los mensajes no se almacenan
-- Máximo de conexiones limitado por sistema operativo
+1. Servidor: `./build/chat_server 8080`
+2. Cliente A: `./build/chat_client Alice 127.0.0.1 8080` → opción `1` y un mensaje.
+3. Cliente B: `./build/chat_client Bob 127.0.0.1 8080` → B recibe el broadcast como `[GENERAL] Alice: ...`
 
-## Características Futuras
+**Mensaje directo**
 
-- [ ] Base de datos persistente
-- [ ] Autenticación de usuarios
-- [ ] Cifrado de mensajes
-- [ ] Salas de chat personalizadas
-- [ ] Historial de mensajes
-- [ ] Archivos compartidos
-- [ ] Audio/Video
+1. Alice opción `2`, destinatario `Bob`, mensaje `Hola`.
+2. Bob ve `[DM de Alice]: Hola`.
+
+---
+
+Más detalles de compilación: [COMPILACION.md](COMPILACION.md).  
+Protocolo en red: [docs/protocol_standard.md](docs/protocol_standard.md).

@@ -1,124 +1,126 @@
-# Instrucciones de Compilación
+# Instrucciones de compilación
 
-## Requisitos Previos
+## Requisitos previos
 
-1. **CMake** 3.10 o superior
-2. **Protobuf** compiler y librerías
-3. **C++ compiler** (g++, clang, o MSVC)
-4. **Git** (para control de versiones)
+| Herramienta | Uso |
+|---------------|-----|
+| **CMake** | 3.10 o superior |
+| **Compilador C++** | Con soporte **C++17** (por ejemplo `g++`, `clang++`) |
+| **Protocol Buffers** | `protoc` y biblioteca de desarrollo (`libprotobuf`) |
 
-### Instalación de Requisitos
+No hace falta invocar `protoc` a mano: **CMake** genera los `.pb.cc` / `.pb.h` al compilar.
 
-#### En Windows con vcpkg:
+## Instalación de dependencias (según el sistema)
+
+### Linux (Debian/Ubuntu y similares)
+
 ```bash
-vcpkg install protobuf:x64-windows
+sudo apt-get update
+sudo apt-get install -y build-essential cmake protobuf-compiler libprotobuf-dev
 ```
 
-#### En Windows con Chocolatey:
-```bash
-choco install cmake protoc
-```
+### macOS (Homebrew)
 
-#### En Ubuntu/Debian:
-```bash
-sudo apt-get install cmake protobuf-compiler libprotobuf-dev
-```
-
-#### En macOS:
 ```bash
 brew install cmake protobuf
 ```
 
-## Pasos de Compilación
+### Windows
 
-### 1. Crear directorio de build
+Instala herramientas equivalentes, por ejemplo:
+
+- **CMake** y un entorno con compilador C++ (Visual Studio Build Tools, o MinGW), y  
+- **Protobuf** (compilador + librerías), según tu entorno (vcpkg, Chocolatey, instalador oficial, etc.).
+
+Luego usa el script `build.bat` desde la raíz del proyecto (ver abajo).
+
+## Compilación recomendada
+
+### Linux y macOS
+
+Desde la **raíz del repositorio**:
+
 ```bash
-mkdir build
-cd build
+chmod +x build.sh
+./build.sh
 ```
 
-### 2. Ejecutar CMake
-```bash
-# Windows (Visual Studio)
-cmake -G "Visual Studio 16 2019" -A x64 ..
+El script crea `build/`, ejecuta CMake con generadores tipo Unix Makefiles y compila con `make -j`.
 
-# O para Ninja
-cmake -G Ninja ..
+### Windows
 
-# O para Unix Makefiles (Linux/macOS)
-cmake -G "Unix Makefiles" ..
+Desde la raíz del proyecto:
+
+```cmd
+build.bat
 ```
 
-### 3. Compilar
-```bash
-# Windows con Visual Studio
-cmake --build . --config Release
+(Tras tener CMake, C++ y Protobuf disponibles en el PATH o configurados como indique tu instalación.)
 
-# O con make
-make
+## Salida
 
-# O con ninja
-ninja
-```
+Los ejecutables quedan en el directorio **`build/`**:
 
-Los ejecutables estarán en:
-- `build/Release/nombe_del_servidor.exe` (Windows)
-- `build/Release/nombe_del_cliente.exe` (Windows)
-- `build/nombe_del_servidor` (Linux/macOS)
-- `build/nombe_del_cliente` (Linux/macOS)
+| Ejecutable | Descripción |
+|------------|-------------|
+| `chat_server` | Servidor de chat (`chat_server.exe` en Windows) |
+| `chat_client` | Cliente de chat (`chat_client.exe` en Windows) |
 
 ## Ejecución
 
-### Iniciar el Servidor
+### Servidor
+
 ```bash
-./nombe_del_servidor [puerto]
-
-# Ejemplo con puerto 8080
-./nombe_del_servidor 8080
+./build/chat_server <puerto>
 ```
 
-### Conectar Clientes
+Ejemplo:
+
 ```bash
-./nombe_del_cliente [host] [puerto]
-
-# Ejemplo local
-./nombe_del_cliente 127.0.0.1 8080
-
-# Ejemplo remoto
-./nombe_del_cliente 192.168.1.100 8080
+./build/chat_server 8080
 ```
 
-## Solución de Problemas
+### Cliente
 
-### Error: "protoc: command not found"
-- Instalar Protobuf compiler en tu sistema
-- En Windows, asegurarse que sea accesible en PATH
-
-### Error de CMake: "Protobuf_NOT_FOUND"
-- En Windows con vcpkg: `cmake -DCMAKE_TOOLCHAIN_FILE=<vcpkg_path>/scripts/buildsystems/vcpkg.cmake ..`
-
-### Error al compilar: undefined reference to protobuf symbols
-- Asegurarse que libprotobuf esté correctamente vinculada
-- En Windows con vcpkg: probablemente necesites usar la variable de herramientas vcpkg
-
-## Estructura de Directorios
-
-```
-Simple-Chat-Protocol/
-├── protos/          # Definiciones de Protocol Buffers
-├── src/
-│   ├── server/      # Código del servidor
-│   ├── client/      # Código del cliente
-│   └── utils/       # Utilidades compartidas
-├── include/         # Headers del proyecto
-├── build/           # Directorio de build (generado)
-├── CMakeLists.txt   # Configuración de CMake
-└── README.md        # Este archivo
+```bash
+./build/chat_client <nombre_usuario> <IP_servidor> <puerto>
 ```
 
-## Notas Importantes
+Ejemplos:
 
-- Los archivos `.pb.h` y `.pb.cc` se generan automáticamente por CMake
-- No deben añadirse al repositorio (están en .gitignore)
-- El puerto por defecto es 8080, puede modificarse en tiempo de ejecución
-- Para desarrollo, se recomienda compilar en modo Debug: `cmake -DCMAKE_BUILD_TYPE=Debug ..`
+```bash
+./build/chat_client alice 127.0.0.1 8080
+./build/chat_client bob 192.168.1.10 8080
+```
+
+## Compilación manual (opcional)
+
+Si prefieres no usar los scripts:
+
+```bash
+mkdir -p build && cd build
+cmake -G "Unix Makefiles" ..
+cmake --build .
+```
+
+En Windows puedes abrir la carpeta `build` en Visual Studio o usar `cmake --build .` según el generador que elijas.
+
+## Solución de problemas
+
+### `protoc: command not found`
+
+Instala el compilador de Protocol Buffers y asegúrate de que esté en el `PATH`.
+
+### CMake: `Protobuf_NOT_FOUND` o errores al enlazar
+
+- Comprueba que existan tanto **`protoc`** como las **bibliotecas de desarrollo** de protobuf.  
+- En algunas instalaciones de protobuf reciente hace falta también **Abseil**; CMake del proyecto intenta enlazarlo si `find_package(absl)` lo encuentra.
+
+### El script falla en `cmake` o `make`
+
+Verifica versiones: CMake ≥ 3.10, compilador con C++17, y que `cmake` y el compilador estén en el `PATH`.
+
+## Notas
+
+- El directorio **`build/`** suele ignorarse en Git; se genera al compilar.  
+- Los archivos generados por protobuf bajo `build/` no deben editarse a mano.

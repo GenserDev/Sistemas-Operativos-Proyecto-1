@@ -6,10 +6,8 @@
 
 ## 📁 Estructura del Proyecto
 
-- [x] Directorio `protos/` con todos los .proto
-  - [x] common.proto
-  - [x] cliente-side/*.proto (7 archivos)
-  - [x] server-side/*.proto (5 archivos)
+- [x] Directorio `protos/` con todos los .proto (archivos sueltos en `protos/`, sin subcarpetas cliente/servidor)
+  - [x] common.proto y resto de `.proto` listados en `CMakeLists.txt`
 
 - [x] Directorio `src/` con código fuente
   - [x] server/ (main.cpp, server.cpp, client_handler.cpp)
@@ -30,7 +28,6 @@
 
 ### Servidor
 - [x] ChatServer clase implementada
-  - [x] Método start() - Iniciar servidor
   - [x] Método run() - Loop principal
   - [x] Método register_user() - Registrar
   - [x] Método unregister_user() - Remover
@@ -44,11 +41,11 @@
 
 ### Cliente
 - [x] ChatClient clase implementada
-  - [x] Método connect() - Conectar
+  - [x] Método connect_to_server() - Conectar
   - [x] Método disconnect() - Desconectar
   - [x] Método run() - Loop principal
   - [x] Método send_register() - Registrarse
-  - [x] Método send_message() - Chat general
+  - [x] Método send_broadcast() - Chat general
   - [x] Método send_dm() - Mensaje directo
   - [x] Método request_user_list() - Pedir lista
   - [x] Método request_user_info() - Pedir info
@@ -60,11 +57,8 @@
 
 ### Utilidades
 - [x] TCPHandler clase
-  - [x] Método listen() - Servidor escucha
-  - [x] Método accept_connection() - Aceptar cliente
-  - [x] Método connect() - Cliente conecta
-  - [x] Método send_message() - Enviar datos
-  - [x] Método receive_message() - Recibir datos
+  - [x] create_server / accept_connection / connect_to
+  - [x] send_all / receive_full_message (framing 5 bytes)
   - [x] Método close_socket() - Cerrar
   - [x] Método get_local_ip() - IP local
   - [x] Compatibilidad Windows/Linux/macOS
@@ -123,8 +117,8 @@
   - [x] Genera executables
   - [x] Vincula librerías
 
-- [x] build.bat (Windows)
-- [x] build.sh (Linux/macOS)
+- [x] build.sh (Linux/macOS): `chmod +x build.sh` y `./build.sh`
+- [x] build.bat (Windows), con CMake/C++/Protobuf instalados
 - [x] .gitignore actualizado
 
 ---
@@ -149,7 +143,7 @@
 - [x] GUIA_USO.md
   - [x] Descripción general
   - [x] Inicio rápido
-  - [x] Menú de opciones (6 opciones)
+  - [x] Menú de opciones (7 opciones: 1–7)
   - [x] Tipos de mensajes del sistema
   - [x] Notas de comportamiento
   - [x] Solución de problemas
@@ -302,18 +296,18 @@
 
 ## 📋 Pasos Siguientes
 
-1. **Compilar el proyecto:**
-   - Windows: `.\build.bat`
-   - Linux/macOS: `./build.sh`
+1. **Compilar el proyecto**
+   - Linux/macOS: `chmod +x build.sh` y `./build.sh`
+   - Windows: `build.bat` (tras instalar CMake, C++ y Protobuf)
 
-2. **Ejecutar servidor:**
+2. **Ejecutar servidor**
    ```bash
-   ./build/nombe_del_servidor 8080
+   ./build/chat_server 8080
    ```
 
-3. **Conectar clientes:**
+3. **Conectar clientes**
    ```bash
-   ./build/nombe_del_cliente 127.0.0.1 8080
+   ./build/chat_client usuario 127.0.0.1 8080
    ```
 
 4. **Ver guía de uso:**

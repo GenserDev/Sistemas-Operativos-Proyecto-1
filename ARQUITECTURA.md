@@ -18,9 +18,9 @@ Protocolo: Protocol Buffers + TCP Framing (encabezado de 5 bytes)
 
 ## Componentes Principales
 
-### 1. Servidor (servidor/)
+### 1. Servidor (`src/server/`)
 
-#### Archivo: `server.h` / `server.cpp`
+#### Archivo: `include/server.h` / `src/server/server.cpp`
 Clase `ChatServer` - Gestiona toda la lógica del servidor.
 
 **Responsabilidades:**
@@ -33,13 +33,12 @@ Clase `ChatServer` - Gestiona toda la lógica del servidor.
 
 **Métodos clave:**
 ```cpp
-bool start();                          // Inicializar servidor
-void run();                            // Loop principal
+void run();                            // Loop principal: listen + accept + threads
 bool register_user();                  // Registrar nuevo usuario
 bool unregister_user();                // Remover usuario
-void broadcast_message();              // Enviar a todos
-void send_dm();                        // Mensaje directo
-void handle_client();                  // Manejar cliente (thread)
+void broadcast_message();              // Enviar a todos (excepto el emisor)
+void send_dm();                       // Mensaje directo
+void handle_client();                 // Manejar cliente (un thread por conexión)
 ```
 
 **Estructura de datos:**
@@ -52,9 +51,9 @@ std::mutex users_mutex;                // Sincronización de acceso
 #### Archivo: `main.cpp`
 Punto de entrada del servidor. Maneja argumentos de línea de comandos.
 
-### 2. Cliente (cliente/)
+### 2. Cliente (`src/client/`)
 
-#### Archivo: `client.h` / `client.cpp`
+#### Archivo: `include/client.h` / `src/client/client.cpp`
 Clase `ChatClient` - Maneja la conexión y lógica de cliente.
 
 **Responsabilidades:**
@@ -66,10 +65,10 @@ Clase `ChatClient` - Maneja la conexión y lógica de cliente.
 
 **Métodos clave:**
 ```cpp
-bool connect();                        // Conectar al servidor
+bool connect_to_server();              // Conectar al servidor
 void run();                            // Loop principal
 bool send_register();                  // Registrarse
-bool send_message();                   // Mensaje general
+bool send_broadcast();                 // Mensaje general
 bool send_dm();                        // Mensaje directo
 void receive_loop();                   // Thread de recepción
 ```
@@ -79,7 +78,7 @@ void receive_loop();                   // Thread de recepción
 - Thread secundario: Recepción continua de mensajes
 
 #### Archivo: `main.cpp`
-Punto de entrada del cliente. Argumentos: `[host] [puerto]`
+Punto de entrada del cliente. Argumentos: `<nombre_usuario> <IP_servidor> <puerto>`
 
 ### 3. Utilidades (utils/)
 
@@ -93,11 +92,11 @@ Clase `TCPHandler` - Abstracción de sockets TCP.
 
 **Métodos clave:**
 ```cpp
-bool listen();                         // Servidor: escuchar
-int accept_connection();               // Servidor: aceptar cliente
-bool connect();                        // Cliente: conectar
-bool send_message();                   // Enviar datos
-std::string receive_message();         // Recibir datos
+static int create_server();            // Servidor: bind + listen
+static int accept_connection();        // Servidor: accept
+static int connect_to();               // Cliente: connect
+static bool send_all();                // Enviar buffer completo
+static std::string receive_full_message();  // Un mensaje con framing 5 bytes
 ```
 
 **Portabilidad:**
@@ -130,22 +129,13 @@ Bytes 5+:  ...     - Payload protobuf serializado
 ```
 Cliente                              Servidor
   │                                    │
-  ├─ Crear MessageRegister             │
-  │  (username, ip)                    │
-  │                                    │
+  ├─ Register (username, ip)           │
   ├─ Enviar REGISTER (tipo 1)          │
-  │ + encabezado 5 bytes               │
-  ├─────────────────────────────────────>
-  │                                    ├─ Recibir mensaje
-  │                                    ├─ Parsear protobuf
-  │                                    ├─ Registrar usuario
-  │                                    ├─ Crear thread para cliente
-  │                                    │
+  ├────────────────────────────────────>
+  │                                    ├─ Recibir, parsear, register_user()
+  │                                    ├─ (El thread del cliente ya existe)
   │                    ServerResponse  │
-  │ <─────────────────────────────────┤
-  │                                    ├─ Enviar AllUsers
-  │    AllUsers (lista usuarios)       │
-  │ <─────────────────────────────────┤
+  │ <─────────────────────────────────┤  (éxito o error, p. ej. nombre/IP duplicados)
   │                                    │
 ```
 
@@ -156,9 +146,9 @@ Cliente A                           Servidor                    Cliente B
     ├─ Enviar MessageGeneral          │                            │
     │─────────────────────────────────>                            │
     │                                 ├─ Recibir y parsear        │
-    │                                 ├─ Foreach usuario (excepto A)
+    │                                 ├─ Por cada usuario (excepto el emisor)
     │                                 ├─ Encapsular BroadcastDelivery
-    │                                 ├─ Enviar a todos (excepto invisible)
+    │                                 ├─ Enviar a todos los demás
     │                                 ├───────────────────────────>
     │                                 │                            ├─ Recibir
     │                                 │                            ├─ Mostrar
@@ -207,8 +197,7 @@ Cliente A                           Servidor                    Cliente B
 
 ### Solución: Mutexes
 ```cpp
-std::mutex users_mutex;  // Protege mapa de usuarios
-std::mutex sockets_mutex; // Protege mapa socket→usuario
+std::mutex users_mutex;  // Protege mapa de usuarios y socket_to_user
 
 std::lock_guard<std::mutex> lock(users_mutex);
 // Acceso seguro a usuarios
@@ -222,53 +211,47 @@ std::lock_guard<std::mutex> lock(users_mutex);
 ## Estructura de Directorios
 
 ```
-Simple-Chat-Protocol/
-├── protos/                 # Definiciones Protocol Buffers
-│   ├── common.proto        # Tipos compartidos (StatusEnum)
-│   ├── cliente-side/       # Mensajes cliente→servidor
-│   │   ├── register.proto
-│   │   ├── message_general.proto
-│   │   ├── message_dm.proto
-│   │   ├── change_status.proto
-│   │   ├── list_users.proto
-│   │   ├── get_user_info.proto
-│   │   └── quit.proto
-│   └── server-side/        # Mensajes servidor→cliente
-│       ├── server_response.proto
-│       ├── all_users.proto
-│       ├── for_dm.proto
-│       ├── broadcast_messages.proto
-│       └── get_user_info_response.proto
-│
-├── src/                    # Código fuente
-│   ├── server/             # Código del servidor
+proyecto/
+├── protos/                 # Todos los .proto (CMake/protoc genera .pb.cc/.pb.h en build)
+│   ├── common.proto
+│   ├── register.proto
+│   ├── message_general.proto
+│   ├── message_dm.proto
+│   ├── change_status.proto
+│   ├── list_users.proto
+│   ├── get_user_info.proto
+│   ├── quit.proto
+│   ├── server_response.proto
+│   ├── all_users.proto
+│   ├── for_dm.proto
+│   ├── broadcast_messages.proto
+│   └── get_user_info_response.proto
+├── src/
+│   ├── server/
 │   │   ├── main.cpp
 │   │   ├── server.cpp
-│   │   └── client_handler.cpp
-│   ├── client/             # Código del cliente
+│   │   └── client_handler.cpp   # reservado / sin lógica activa
+│   ├── client/
 │   │   ├── main.cpp
 │   │   └── client.cpp
-│   └── utils/              # Código compartido
+│   └── utils/
 │       ├── tcp_handler.cpp
 │       └── message_handler.cpp
-│
-├── include/                # Headers (.h)
-│   ├── tcp_handler.h
-│   ├── message_handler.h
-│   ├── server.h
-│   └── client.h
-│
-├── build/                  # Directorio de compilación (generado)
-│   ├── nombe_del_servidor  # Ejecutable del servidor
-│   └── nombe_del_cliente   # Ejecutable del cliente
-│
-├── CMakeLists.txt          # Configuración de CMake
-├── .gitignore
+├── include/
+├── docs/
+├── build/                  # Generado: chat_server, chat_client
+├── CMakeLists.txt
+├── build.sh
+├── build.bat
 ├── README.md
-├── COMPILACION.md          # Instrucciones de compilación
-├── GUIA_USO.md            # Guía de usuario
-└── ARQUITECTURA.md         # Este archivo
+├── COMPILACION.md
+├── GUIA_USO.md
+└── ARQUITECTURA.md
 ```
+
+## Compilación
+
+Recomendado en Linux/macOS: `chmod +x build.sh` y `./build.sh`. En Windows: `build.bat`. CMake genera los fuentes protobuf y enlaza `libprotobuf`. Ver [COMPILACION.md](COMPILACION.md).
 
 ## Flujo de Ejecución
 
@@ -297,31 +280,23 @@ main()
 ### Cliente
 ```
 main()
-  ├─ Parsear argumentos (host, puerto)
+  ├─ Parsear argumentos (usuario, IP servidor, puerto)
   ├─ Crear ChatClient
-  ├─ Conectar al servidor
-  └─ Llamar client.run()
-      ├─ Leer nombre de usuario
-      ├─ Enviar REGISTER
-      ├─ Lanzar receive_thread:
-      │   └─ While running:
-      │       ├─ receive_message() de servidor
-      │       ├─ unwrap_message + parsear
-      │       └─ process_server_message()
-      │           └─ Mostrar en pantalla
-      ├─ handle_user_input() (thread principal)
-      │   └─ While running:
-      │       ├─ display_menu()
-      │       ├─ leer opción usuario
-      │       ├─ según opción:
-      │       │   ├─ 1: send_message()
-      │       │   ├─ 2: send_dm()
-      │       │   ├─ 3: request_user_list()
-      │       │   ├─ 4: request_user_info()
-      │       │   ├─ 5: change_status()
-      │       │   └─ 6: send_quit() y salir
-      │       └─ wrap_message() + send
-      └─ Fin
+  ├─ connect_to_server()
+  └─ client.run()
+      ├─ send_register()
+      ├─ Lanzar receive_thread → receive_loop()
+      │   └─ receive_full_message + unwrap + process_server_message()
+      ├─ handle_user_input() (thread principal, menú 1–7)
+      │   ├─ 1: send_broadcast()
+      │   ├─ 2: send_dm()
+      │   ├─ 3: change_status()
+      │   ├─ 4: request_user_list()
+      │   ├─ 5: request_user_info()
+      │   ├─ 6: display_help()
+      │   └─ 7: salir
+      ├─ send_quit()
+      └─ disconnect()
 ```
 
 ## Decisiones de Diseño

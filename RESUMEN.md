@@ -46,9 +46,7 @@ Este documento resume la implementación completa del proyecto Simple Chat Proto
 ### ✅ Servidor (`src/server/`)
 ```cpp
 class ChatServer {
-  - listen(host, port)               // Escuchar conexiones
-  - accept_connection()              // Aceptar cliente
-  - run()                            // Loop principal
+  - run()                            // Loop principal (listen + accept + threads)
   - register_user()                  // Registrar usuario
   - unregister_user()                // Remover usuario
   - get_user()                       // Obtener info usuario
@@ -57,7 +55,6 @@ class ChatServer {
   - send_dm()                        // Mensaje directo
   - update_user_status()             // Cambiar estado
   - handle_client()                  // Thread de cliente
-  - process_message()                // Procesar mensaje
 }
 ```
 
@@ -74,11 +71,11 @@ class ChatServer {
 ### ✅ Cliente (`src/client/`)
 ```cpp
 class ChatClient {
-  - connect()                        // Conectar al servidor
+  - connect_to_server()              // Conectar al servidor
   - disconnect()                     // Desconectar
   - run()                            // Loop principal
   - send_register()                  // Enviar registro
-  - send_message()                   // Enviar al chat general
+  - send_broadcast()                 // Enviar al chat general
   - send_dm()                        // Enviar mensaje directo
   - request_user_list()              // Pedir lista usuarios
   - request_user_info()              // Pedir info usuario
@@ -86,13 +83,13 @@ class ChatClient {
   - send_quit()                      // Desconectar
   - receive_loop()                   // Thread de recepción
   - process_server_message()         // Procesar mensaje servidor
-  - display_menu()                   // Mostrar menú
+  - display_help()                   // Mostrar ayuda
   - handle_user_input()              // Entrada del usuario
 }
 ```
 
 **Características:**
-- ✅ Interfaz CLI interactivo (6 opciones)
+- ✅ Interfaz CLI interactivo (menú 1–7: broadcast, DM, estado, lista, info, ayuda, salir)
 - ✅ Threading para envío/recepción simultánea
 - ✅ Registro automático al conectar
 - ✅ Envío de 7 tipos de mensaje
@@ -105,13 +102,9 @@ class ChatClient {
 #### TCPHandler
 ```cpp
 class TCPHandler {
-  - listen()                         // Servidor: escuchar
-  - accept_connection()              // Servidor: aceptar
-  - connect()                        // Cliente: conectar
-  - send_message()                   // Enviar datos
-  - receive_message()                // Recibir datos
-  - close_socket()                   // Cerrar conexión
-  - get_local_ip()                   // Obtener IP local
+  - create_server() / accept_connection() / connect_to()
+  - send_all() / receive_full_message()  // framing 5 bytes + payload
+  - close_socket() / get_local_ip() / get_peer_ip()
 }
 ```
 
@@ -170,8 +163,7 @@ Bytes 5+:  Payload protobuf serializado
 
 ### Servidor
 - **N threads**: Uno por cada cliente conectado
-- **Mutex users_mutex**: Protege mapa de usuarios
-- **Mutex sockets_mutex**: Protege mapeo socket→usuario
+- **Mutex users_mutex**: Protege mapas de usuarios y socket→usuario
 - **Lock guard**: RAII para automatizar locks
 
 ### Cliente
@@ -242,34 +234,41 @@ Basados en el PDF del curso (CC3064 - Proyecto 1 - 2026):
 
 ## 🚀 Cómo Compilar
 
-### Windows
-```bash
-.\build.bat
-```
+### Linux y macOS (recomendado)
 
-### Linux/macOS
+Tras instalar CMake, compilador C++17 y Protobuf:
+
 ```bash
 chmod +x build.sh
 ./build.sh
 ```
 
-### Manual
+### Windows
+
+Con las mismas dependencias configuradas:
+
+```cmd
+build.bat
+```
+
+### Manual (opcional)
+
 ```bash
-mkdir build && cd build
-cmake ..
-cmake --build . --config Release
+mkdir -p build && cd build
+cmake -G "Unix Makefiles" ..
+cmake --build .
 ```
 
 ## 🎮 Cómo Usar
 
-### Iniciar Servidor
+### Iniciar servidor
 ```bash
-./nombe_del_servidor 8080
+./build/chat_server 8080
 ```
 
-### Conectar Clientes
+### Conectar clientes
 ```bash
-./nombe_del_cliente 127.0.0.1 8080
+./build/chat_client nombre_usuario 127.0.0.1 8080
 ```
 
 Ver [GUIA_USO.md](GUIA_USO.md) para instrucciones detalladas.
